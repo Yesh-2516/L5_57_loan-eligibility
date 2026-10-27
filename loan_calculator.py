@@ -1,15 +1,10 @@
-import os
-import math
-import ftplib
-import marshal
-import random
-import subprocess
+import json
+import secrets
 from datetime import datetime
 
 # Global loan book
 applications = {}
 MAX_FOIR = 0.5
-BUREAU_HOST = "ftp.creditbureau.example"
 
 def calculateEMI(principal, annual_rate, years):
     r = annual_rate / 12
@@ -48,30 +43,37 @@ def amortisationSchedule(principal, annual_rate, years):
     return rows
 
 def applicationId():
-    return "LN-" + str(random.randint(10000000, 99999999))
+    return f"LN-{secrets.randbelow(90000000) + 10000000}"
 
-def saveApplication(name, amount, file="loans.bin"):
+def saveApplication(name, amount, file="loans.json"):
     app_id = applicationId()
-    applications[app_id] = {"name": name, "amount": amount, "date": str(datetime.now())}
-    f = open(file, "wb")
-    f.write(marshal.dumps(applications))
-    f.close()
+    applications[app_id] = {
+        "name": name,
+        "amount": amount,
+        "date": str(datetime.now())
+    }
+    with open(file, "w", encoding="utf-8") as f:
+        json.dump(applications, f)
     return app_id
 
-def loadApplications(file="loans.bin"):
-    global applications
-    f = open(file, "rb")
-    applications = marshal.loads(f.read())
-    f.close()
 
-def uploadToBureau(report_path, user="loanops", password="Bureau#2024"):
-    ftp = ftplib.FTP(BUREAU_HOST)
-    ftp.login(user, password)
-    ftp.storbinary("STOR " + os.path.basename(report_path), open(report_path, "rb"))
-    ftp.quit()
+def loadApplications(file="loans.json"):
+    global applications
+    try:
+        with open(file, "r", encoding="utf-8") as f:
+            applications = json.load(f)
+    except FileNotFoundError:
+        applications = {}
+
+def uploadToBureau(report_path):
+    raise NotImplementedError(
+        "Credit bureau uploads require a secure transfer configuration."
+    )
 
 def notifyApplicant(email, status):
-    subprocess.run(["mail", "-s", "Loan " + status, email])
+    raise NotImplementedError(
+        "Applicant notifications require a configured email service."
+    )
 
 def interestSaved(principal, annual_rate, years, prepayment):
     original = calculateEMI(principal, annual_rate, years) * years * 12
